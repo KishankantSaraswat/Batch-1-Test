@@ -2,7 +2,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         const response = await fetch("http://localhost:3001/data");
         const data = await response.json();
-        let filteredData = [...data]; // Keep original data separate
+
+        // Add `isPinned` property to each student for pinning functionality
+        let filteredData = data.map(student => ({ ...student, isPinned: false })); 
         const leaderboardBody = document.getElementById('leaderboard-body');
         const sectionFilter = document.getElementById('section-filter');
 
@@ -34,7 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     student.url
                 ].join(',');
             });
-            
+
             const csvContent = [headers.join(','), ...csvRows].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -50,7 +52,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Function to render the leaderboard
         const renderLeaderboard = (sortedData) => {
             leaderboardBody.innerHTML = '';
-            sortedData.forEach((student, index) => {
+
+            // Separate pinned and unpinned students
+            const pinnedData = sortedData.filter(student => student.isPinned);
+            const unpinnedData = sortedData.filter(student => !student.isPinned);
+
+            const allData = [...pinnedData, ...unpinnedData];
+
+            allData.forEach((student, index) => {
                 const row = document.createElement('tr');
                 row.classList.add('border-b', 'border-gray-700');
                 row.innerHTML = `
@@ -58,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="p-4">${student.roll}</td>
                     <td class="p-4">
                         ${student.url.startsWith('https://leetcode.com/u/') 
-                            ? `<a href="${student.url}" target="_blank" class="text-blue-400">${student.name}</a>`
+                            ? `<a href="${student.url}" target="_blank" class="text-blue-400">${student.name}</a>` 
                             : `<div class="text-red-500">${student.name}</div>`}
                     </td>
                     <td class="p-4">${student.section || 'N/A'}</td>
@@ -66,16 +75,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="p-4 text-green-400">${student.easySolved || 'N/A'}</td>
                     <td class="p-4 text-yellow-400">${student.mediumSolved || 'N/A'}</td>
                     <td class="p-4 text-red-400">${student.hardSolved || 'N/A'}</td>
+                    <td class="p-4">
+                        <button data-roll="${student.roll}" class="pin-btn text-white bg-blue-500 px-2 py-1 rounded">
+                            ${student.isPinned ? 'Unpin' : 'Pin'}
+                        </button>
+                    </td>
                 `;
+
                 leaderboardBody.appendChild(row);
             });
+
+            // Add event listeners to pin buttons
+            document.querySelectorAll('.pin-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const roll = e.target.dataset.roll;
+                    togglePin(roll);
+                });
+            });
+        };
+
+        // Toggle pinning/unpinning
+        const togglePin = (roll) => {
+            const student = filteredData.find(s => s.roll === roll);
+            if (student) {
+                student.isPinned = !student.isPinned;
+                renderLeaderboard(filteredData);
+            }
         };
 
         // Filter function
         const filterData = (section) => {
             filteredData = section === 'all' 
-                ? [...data]
-                : data.filter(student => (student.section || 'N/A') === section);
+                ? data.map(student => ({ ...student, isPinned: false }))
+                : data
+                    .filter(student => (student.section || 'N/A') === section)
+                    .map(student => ({ ...student, isPinned: false }));
             renderLeaderboard(filteredData);
         };
 
@@ -102,7 +136,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Initialize the page
         populateSectionFilter();
-        renderLeaderboard(data);
+        renderLeaderboard(filteredData);
 
         // Event Listeners
         sectionFilter.addEventListener('change', (e) => {
